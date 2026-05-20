@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  assistant_team:
+    build: .
+    container_name: script_assistant
+    working_dir: /app
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/app/data
+      - ./skills:/app/skills
+    env_file:
+      - .env
+    environment:
+      - TZ=Asia/Shanghai
+      - PYTHONPATH=/app/backend
+    restart: always
+    command: python backend/src/launch.py

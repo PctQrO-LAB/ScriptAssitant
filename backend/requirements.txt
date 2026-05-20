@@ -1,0 +1,11 @@
+openai>=1.0.0
+fastapi>=0.100.0
+uvicorn[standard]>=0.23.0
+pydantic>=2.0.0
+python-dotenv>=1.0.0
+python-multipart>=0.0.9
+pypdf>=4.0.0
+python-docx>=1.0.0
+transformers==4.38.2
+# 建议安装 CPU 版本的 PyTorch 即可，推理速度完全够用，且能大幅减小 Docker 镜像体积
+torch --index-url https://download.pytorch.org/whl/cpu

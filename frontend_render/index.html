@@ -1,0 +1,1119 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="utf-8">
+  <title>剧本标注编辑器 - Script Assistant</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="assets/css/normalize.min.css" rel="stylesheet">
+  <link href="assets/css/fountain-js.css" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: #1a1a2e;
+      color: #e0e0e0;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .topbar {
+      background: #16213e;
+      border-bottom: 1px solid #0f3460;
+      padding: 8px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 44px;
+    }
+
+    .topbar h1 {
+      font-size: 15px;
+      color: #e94560;
+    }
+
+    .topbar .status {
+      font-size: 12px;
+      color: #a0b4d0;
+    }
+
+    .topbar .btn-settings {
+      background: none;
+      border: 1px solid #0f3460;
+      color: #a0b4d0;
+      padding: 4px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+      margin-left: 8px;
+    }
+
+    .topbar .btn-settings:hover {
+      background: #0f3460;
+      color: #fff;
+    }
+
+    .topbar .btn-settings.has-config {
+      border-color: #4ecca3;
+      color: #4ecca3;
+    }
+
+    /* ── 设置弹窗 ──────────────────────────────── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-overlay.show {
+      display: flex;
+    }
+
+    .modal {
+      background: #16213e;
+      border: 1px solid #0f3460;
+      border-radius: 12px;
+      padding: 28px 32px;
+      width: 440px;
+      max-width: 90vw;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    }
+
+    .modal h2 {
+      font-size: 18px;
+      color: #e94560;
+      margin-bottom: 6px;
+    }
+
+    .modal .subtitle {
+      font-size: 12px;
+      color: #5a7aaa;
+      margin-bottom: 20px;
+    }
+
+    .modal label {
+      display: block;
+      font-size: 12px;
+      color: #a0b4d0;
+      margin-bottom: 4px;
+      margin-top: 14px;
+    }
+
+    .modal label:first-of-type {
+      margin-top: 0;
+    }
+
+    .modal input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #0f3460;
+      border-radius: 6px;
+      background: #1a1a2e;
+      color: #c8d6e5;
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .modal input:focus {
+      border-color: #e94560;
+    }
+
+    .modal input::placeholder {
+      color: #3a4a6a;
+    }
+
+    .modal .hint {
+      font-size: 11px;
+      color: #5a7aaa;
+      margin-top: 3px;
+    }
+
+    .modal .btn-row {
+      display: flex;
+      gap: 10px;
+      margin-top: 22px;
+      justify-content: flex-end;
+    }
+
+    .modal .btn-row button {
+      padding: 8px 20px;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      border: 1px solid #0f3460;
+      background: #1a1a2e;
+      color: #c8d6e5;
+    }
+
+    .modal .btn-row button:hover {
+      background: #0f3460;
+    }
+
+    .modal .btn-row button.primary {
+      background: #e94560;
+      border-color: #e94560;
+      color: #fff;
+    }
+
+    .modal .btn-row button.primary:hover {
+      background: #c73652;
+    }
+
+    .modal .test-result {
+      font-size: 12px;
+      margin-top: 10px;
+      min-height: 18px;
+    }
+
+    .modal .test-result.ok {
+      color: #4ecca3;
+    }
+
+    .modal .test-result.err {
+      color: #e94560;
+    }
+
+    .main {
+      display: flex;
+      height: calc(100vh - 44px);
+    }
+
+    .editor-panel {
+      width: 50%;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid #0f3460;
+    }
+
+    .editor-toolbar {
+      display: flex;
+      gap: 6px;
+      padding: 8px 12px;
+      background: #16213e;
+      border-bottom: 1px solid #0f3460;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .editor-toolbar button,
+    .editor-toolbar select {
+      padding: 5px 12px;
+      border: 1px solid #0f3460;
+      border-radius: 4px;
+      background: #1a1a2e;
+      color: #c8d6e5;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .editor-toolbar button:hover {
+      background: #0f3460;
+    }
+
+    .editor-toolbar button.primary {
+      background: #e94560;
+      border-color: #e94560;
+      color: #fff;
+    }
+
+    .editor-toolbar button.primary:hover {
+      background: #c73652;
+    }
+
+    .editor-toolbar button.primary:disabled {
+      background: #5a3a4a;
+      color: #888;
+      cursor: not-allowed;
+    }
+
+    .editor-toolbar .sep {
+      width: 1px;
+      height: 20px;
+      background: #0f3460;
+      margin: 0 4px;
+    }
+
+    .editor-toolbar .tag-hint {
+      font-size: 11px;
+      color: #5a7aaa;
+      margin-left: auto;
+    }
+
+    .annotated-editor {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── 文件上传区域 ──────────────────────────────── */
+    .upload-zone {
+      border: 2px dashed #0f3460;
+      border-radius: 10px;
+      margin: 10px 12px;
+      padding: 18px 16px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      background: rgba(15, 52, 96, 0.15);
+      position: relative;
+    }
+
+    .upload-zone:hover,
+    .upload-zone.drag-over {
+      border-color: #e94560;
+      background: rgba(233, 69, 96, 0.1);
+      box-shadow: 0 0 20px rgba(233, 69, 96, 0.15);
+    }
+
+    .upload-zone.drag-over {
+      transform: scale(1.02);
+    }
+
+    .upload-zone .upload-icon {
+      font-size: 28px;
+      margin-bottom: 6px;
+      display: block;
+    }
+
+    .upload-zone .upload-text {
+      font-size: 13px;
+      color: #a0b4d0;
+      line-height: 1.6;
+    }
+
+    .upload-zone .upload-text strong {
+      color: #e94560;
+    }
+
+    .upload-zone .upload-formats {
+      font-size: 11px;
+      color: #5a7aaa;
+      margin-top: 4px;
+    }
+
+    .upload-zone input[type="file"] {
+      display: none;
+    }
+
+    .upload-zone .upload-status {
+      margin-top: 8px;
+      font-size: 12px;
+      color: #4ecca3;
+      display: none;
+    }
+
+    .upload-zone .upload-status.show {
+      display: block;
+    }
+
+    .upload-zone .upload-status.error {
+      color: #e94560;
+    }
+
+    .annotated-editor textarea {
+      width: 100%;
+      height: 100%;
+      border: none;
+      padding: 16px;
+      font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+      font-size: 13px;
+      line-height: 1.8;
+      resize: none;
+      outline: none;
+      background: #1a1a2e;
+      color: #c8d6e5;
+    }
+
+    .annotated-editor textarea::placeholder {
+      color: #3a4a6a;
+    }
+
+    .preview-panel {
+      width: 50%;
+      overflow-y: auto;
+      background: #fff;
+      /* 改成白底以便于阅读和打印 */
+    }
+
+    .preview-panel .placeholder {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: #999;
+      font-size: 14px;
+    }
+
+    #script {
+      padding: 40px 50px;
+      max-width: 800px;
+      margin: 0 auto;
+      color: #1a1a1a;
+
+      /* ==========================================
+         CJK 剧本皮肤：自定义传统中文排版样式
+         ========================================== */
+      /* 全局初始化计数器，用于场景自动编号 */
+      counter-reset: scene-idx;
+      font-size: 12pt;
+      /* 基准全文字号 */
+      line-height: 1.5;
+      /* 保证段后一行的比例美观 */
+    }
+
+    /* 1. 动作描述 (Action)
+       要求：宋体，12pt，左右对齐，向右缩进2.5字符，段后间隔一行，段前30pt */
+    #script>p:not([class]) {
+      font-family: "SimSun", "STSong", "Songti SC", serif !important;
+      font-size: 12pt !important;
+      text-align: justify !important;
+      margin-left: 2.5em !important;
+      /* 向右缩进 2.5 字符 */
+      margin-top: 30pt !important;
+      /* 段前 30pt */
+      margin-bottom: 1.5em !important;
+      /* 段后间隔约一行 */
+    }
+
+    /* 2. 场景标题 (Scene Heading)
+       要求：宋体，12pt，加粗，自动编号，编号与内容间距1.1cm */
+    #script h3 {
+      counter-increment: scene-idx;
+      /* 每次出现场景标题，编号自增 1 */
+      font-family: "SimSun", "STSong", "Songti SC", serif !important;
+      font-size: 12pt !important;
+      font-weight: bold !important;
+      margin-top: 20pt !important;
+      margin-bottom: 10pt !important;
+      margin-left: 0 !important;
+      /* 清除默认缩进 */
+    }
+
+    /* 利用伪元素在场景标题前自动注入编号与间距 */
+    #script h3::before {
+      content: counter(scene-idx);
+      /* 自动显示当前场景编号 */
+      margin-right: 1.1cm;
+      /* 编号与内容间距严格保持 1.1cm */
+      display: inline-block;
+    }
+
+    /* 3. 角色名 (Character)
+       要求：宋体，12pt，左右对齐，名前加短下横线与一个空格，向右缩进9字符，段后无间距 */
+    #script h4 {
+      font-family: "SimSun", "STSong", "Songti SC", serif !important;
+      font-size: 12pt !important;
+      font-weight: normal !important;
+      /* 如果不需要加粗可设为 normal */
+      text-align: justify !important;
+      margin-left: 9em !important;
+      /* 向右缩进 9 字符 */
+      margin-top: 10pt !important;
+      margin-bottom: 0 !important;
+      /* 段后严格无间距 */
+      width: auto !important;
+      /* 覆盖 fountain-js 的限制 */
+    }
+
+    /* 利用伪元素在角色名前面全自动拼接“短下横线和一个空格” */
+    #script h4::before {
+      content: "_ ";
+      /* 短下横线字符（或根据喜好换成 — 破折号）与一个空格 */
+    }
+
+    /* 为了防止 fountain-js 的 dialogue 容器居中限制了内部 margin，清空对话块容器的限制 */
+    #script .dialogue {
+      margin: 0 !important;
+      width: 100% !important;
+    }
+
+    /* 4. 对白 (Dialogue)
+       要求：宋体，12pt，左右对齐，向右缩进10字符，右侧也缩进10字符 */
+    #script .dialogue>p:not(.parenthetical) {
+      font-family: "SimSun", "STSong", "Songti SC", serif !important;
+      font-size: 12pt !important;
+      text-align: justify !important;
+      margin-left: 10em !important;
+      /* 向右缩进 10 字符 */
+      margin-right: 10em !important;
+      /* 文本之后（右侧）也缩进 10 字符 */
+      margin-top: 2pt !important;
+      margin-bottom: 8pt !important;
+    }
+
+    /* 5. 旁白/舞台提示 (Parenthetical)
+       要求：楷体，12pt，左右对齐，向右缩进10字符，右侧也缩进10字符，段后无间距 */
+    #script .parenthetical {
+      font-family: "KaiTi", "STKaiti", "Kaiti SC", serif !important;
+      /* 切换为标准的中文楷体系统字库 */
+      font-size: 12pt !important;
+      text-align: justify !important;
+      margin-left: 10em !important;
+      /* 向右缩进 10 字符 */
+      margin-right: 10em !important;
+      /* 文本之后（右侧）也缩进 10 字符 */
+      margin-top: 2pt !important;
+      margin-bottom: 0 !important;
+      /* 段后严格无间距 */
+    }
+
+    .progress-bar {
+      height: 3px;
+      background: #0f3460;
+      transition: width 0.3s;
+    }
+
+    .progress-bar.active {
+      background: #e94560;
+    }
+
+    @media print {
+      @page {
+        size: A4;
+        margin: 2.54cm 3.17cm;
+        /* 标准 Word A4 纸边距 */
+      }
+
+      body {
+        background: #fff;
+        margin: 0;
+        padding: 0;
+      }
+
+      .topbar,
+      .progress-bar,
+      .editor-panel {
+        display: none !important;
+      }
+
+      .main {
+        height: auto;
+        display: block;
+      }
+
+      .preview-panel {
+        width: 100%;
+        height: auto;
+        overflow: visible;
+        background: #fff;
+      }
+
+      #script {
+        padding: 0 !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+      }
+
+      /* 打印时避免元素被切断 */
+      #script h3 {
+        page-break-after: avoid;
+      }
+
+      #script h4 {
+        page-break-after: avoid;
+      }
+
+      #script .dialogue {
+        page-break-inside: avoid;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .main {
+        flex-direction: column;
+      }
+
+      .editor-panel {
+        width: 100%;
+        height: 50%;
+        border-right: none;
+        border-bottom: 1px solid #0f3460;
+      }
+
+      .preview-panel {
+        width: 100%;
+        height: 50%;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="topbar">
+    <h1>🎬 Script Assistant</h1>
+    <div>
+      <span class="status" id="status-text">就绪</span>
+      <button class="btn-settings" id="btn-settings" onclick="openSettings()" title="API 设置">⚙️ 设置</button>
+    </div>
+  </div>
+  <div class="progress-bar" id="progress-bar" style="width:0%"></div>
+
+  <!-- ── 设置弹窗 ──────────────────────────────── -->
+  <div class="modal-overlay" id="settings-modal">
+    <div class="modal">
+      <h2>⚙️ API 设置</h2>
+      <p class="subtitle">配置你的 AI 接口，配置仅保存在浏览器本地</p>
+      <label>API Key <span style="color:#e94560">*</span></label>
+      <input type="password" id="cfg-key" placeholder="sk-xxxxxxxxxxxxxxxx">
+      <label>Base URL</label>
+      <input type="text" id="cfg-url" placeholder="https://api.deepseek.com">
+      <div class="hint">留空使用 OpenAI 官方；DeepSeek 填 https://api.deepseek.com</div>
+      <label>模型名称</label>
+      <input type="text" id="cfg-model" placeholder="deepseek-v4-flash">
+      <div class="hint">留空默认 gpt-4o-mini</div>
+      <div class="test-result" id="test-result"></div>
+      <div class="btn-row">
+        <button onclick="testConnection()">🔍 测试连接</button>
+        <button onclick="closeSettings()">取消</button>
+        <button class="primary" onclick="saveSettings()">💾 保存</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="editor-panel">
+      <div class="editor-toolbar">
+        <button class="primary" id="btn-annotate" onclick="startAnnotate()">🤖 AI 标注</button>
+        <button id="btn-format" onclick="doFormat()">📄 格式化预览</button>
+        <button onclick="window.print()" style="background: #28a745; color: white; border-color: #28a745;">🖨️ 导出
+          PDF</button>
+        <span class="sep"></span>
+        <select id="tag-select" onchange="applyTag()">
+          <option value="">选择类型...</option>
+          <option value="h">[h] 场景标题</option>
+          <option value="a">[a] 动作描述</option>
+          <option value="c">[c] 角色名</option>
+          <option value="d">[d] 对白</option>
+          <option value="p">[p] 旁白括号</option>
+          <option value="t">[t] 转场</option>
+          <option value="l">[l] 歌词</option>
+          <option value="n">[n] 居中</option>
+          <option value="s">[s] 章节</option>
+          <option value="y">[y] 概要</option>
+          <option value="x">[x] 注释</option>
+          <option value="b">[b] 废弃</option>
+          <option value="g">[g] 分页</option>
+        </select>
+        <button onclick="clearTags()">清除标记</button>
+        <span class="tag-hint">选中行 → 下拉选类型 → 自动加标记</span>
+      </div>
+      <div class="annotated-editor">
+        <!-- 文件上传区域 -->
+        <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()"
+          ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)">
+          <span class="upload-icon">📂</span>
+          <div class="upload-text">
+            <strong>点击选择文件</strong> 或拖拽文件到此处<br>
+            也支持直接在下方文本框 <strong>Ctrl+V 粘贴</strong> 内容
+          </div>
+          <div class="upload-formats">支持格式：.docx · .pdf · .md · .txt · .fountain</div>
+          <input type="file" id="file-input" accept=".docx,.pdf,.md,.markdown,.txt,.fountain"
+            onchange="handleFileSelect(event)">
+          <div class="upload-status" id="upload-status"></div>
+        </div>
+        <textarea id="editor"
+          placeholder="在此粘贴混乱的剧本……&#10;然后点击「🤖 AI 标注」&#10;&#10;AI 会在每行前自动添加 [h][a][c] 等类型标记&#10;你也可以手动选中行，用上方下拉菜单改标记"></textarea>
+      </div>
+    </div>
+    <div class="preview-panel" id="preview-panel">
+      <div class="placeholder">👈 粘贴剧本 → AI 标注 → 格式化预览</div>
+    </div>
+  </div>
+
+  <script src="assets/js/fountain.js"></script>
+  <script>
+    // ── API 设置管理 ──────────────────────────────
+    const SETTINGS_KEY = 'script_assistant_config';
+
+    function getConfig() {
+      try {
+        return JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {};
+      } catch (e) { return {}; }
+    }
+
+    function saveConfig(cfg) {
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(cfg));
+    }
+
+    function hasConfig() {
+      const cfg = getConfig();
+      return !!(cfg.api_key && cfg.api_key.trim());
+    }
+
+    function updateSettingsButton() {
+      const btn = document.getElementById('btn-settings');
+      if (hasConfig()) {
+        btn.classList.add('has-config');
+        btn.textContent = '⚙️ 已配置';
+      } else {
+        btn.classList.remove('has-config');
+        btn.textContent = '⚙️ 设置';
+      }
+    }
+
+    function openSettings() {
+      const cfg = getConfig();
+      document.getElementById('cfg-key').value = cfg.api_key || '';
+      document.getElementById('cfg-url').value = cfg.base_url || '';
+      document.getElementById('cfg-model').value = cfg.model || '';
+      document.getElementById('test-result').textContent = '';
+      document.getElementById('test-result').className = 'test-result';
+      document.getElementById('settings-modal').classList.add('show');
+    }
+
+    function closeSettings() {
+      document.getElementById('settings-modal').classList.remove('show');
+    }
+
+    function saveSettings() {
+      const cfg = {
+        api_key: document.getElementById('cfg-key').value.trim(),
+        base_url: document.getElementById('cfg-url').value.trim(),
+        model: document.getElementById('cfg-model').value.trim(),
+      };
+      if (!cfg.api_key) {
+        document.getElementById('test-result').textContent = '❌ 请填写 API Key';
+        document.getElementById('test-result').className = 'test-result err';
+        return;
+      }
+      saveConfig(cfg);
+      updateSettingsButton();
+      document.getElementById('status-text').textContent = '配置已保存 ✅';
+      closeSettings();
+      setTimeout(() => {
+        if (document.getElementById('status-text').textContent === '配置已保存 ✅') {
+          document.getElementById('status-text').textContent = '就绪';
+        }
+      }, 2000);
+    }
+
+    async function testConnection() {
+      const key = document.getElementById('cfg-key').value.trim();
+      const url = document.getElementById('cfg-url').value.trim();
+      const model = document.getElementById('cfg-model').value.trim();
+      const resultEl = document.getElementById('test-result');
+
+      if (!key) {
+        resultEl.textContent = '❌ 请先填写 API Key';
+        resultEl.className = 'test-result err';
+        return;
+      }
+
+      resultEl.textContent = '⏳ 正在测试连接...';
+      resultEl.className = 'test-result';
+
+      try {
+        const resp = await fetch('/api/annotate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ script: '测试', api_key: key, base_url: url, model: model }),
+        });
+        if (resp.ok) {
+          resultEl.textContent = '✅ 连接成功！';
+          resultEl.className = 'test-result ok';
+        } else {
+          const err = await resp.json();
+          resultEl.textContent = '❌ ' + (err.detail || '连接失败');
+          resultEl.className = 'test-result err';
+        }
+      } catch (e) {
+        resultEl.textContent = '❌ 网络错误: ' + e.message;
+        resultEl.className = 'test-result err';
+      }
+    }
+
+    // 点击遮罩关闭
+    document.getElementById('settings-modal').addEventListener('click', function (e) {
+      if (e.target === this) closeSettings();
+    });
+
+    updateSettingsButton();
+  </script>
+  <script>
+    const TAG_TYPES = ['h', 'a', 'c', 'd', 'p', 't', 'l', 'n', 's', 'y', 'x', 'b', 'g'];
+
+    // 防抖定时器，防止流式输出时频繁调用 fountain.parse 卡死页面
+    let formatDebounceTimer = null;
+
+    function debouncedFormat() {
+      clearTimeout(formatDebounceTimer);
+      formatDebounceTimer = setTimeout(() => {
+        doFormat();
+      }, 500); // 停顿 500 毫秒后再渲染右侧预览
+    }
+
+    async function startAnnotate() {
+      const editor = document.getElementById('editor');
+      const btn = document.getElementById('btn-annotate');
+      const bar = document.getElementById('progress-bar');
+      const status = document.getElementById('status-text');
+      const raw = editor.value.trim();
+      if (!raw) { alert('请先粘贴剧本内容'); return; }
+
+      btn.disabled = true; btn.textContent = '⏳ 标注中...';
+      bar.style.width = '0%'; bar.classList.add('active');
+      status.textContent = 'AI 正在标注...';
+      try {
+        const resp = await fetch('/api/annotate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            script: raw,
+          })
+        });
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            const data = JSON.parse(line.slice(6));
+            if (data.type === 'start') status.textContent = `标注中 0/${data.total} 段`;
+            else if (data.type === 'progress') {
+              bar.style.width = Math.round((data.chunk / data.total) * 100) + '%';
+              status.textContent = `标注中 ${data.chunk}/${data.total} 段`;
+            } else if (data.type === 'text') {
+              editor.value = data.content;
+              editor.scrollTop = editor.scrollHeight; // 文本框自动滚动到底部
+              debouncedFormat(); // 使用防抖渲染右侧
+            } else if (data.type === 'done') {
+              bar.style.width = '100%'; status.textContent = '标注完成 ✅';
+              setTimeout(() => { bar.style.width = '0%'; bar.classList.remove('active'); }, 1500);
+            } else if (data.type === 'error') status.textContent = '❌ ' + data.message;
+          }
+        }
+      } catch (err) { status.textContent = '❌ ' + err.message; }
+      finally { btn.disabled = false; btn.textContent = '🤖 AI 标注'; }
+    }
+
+    function doFormat() {
+      const editor = document.getElementById('editor');
+      const preview = document.getElementById('preview-panel');
+      const annotated = editor.value.trim();
+      if (!annotated) { preview.innerHTML = '<div class="placeholder">👈 粘贴剧本 → AI 标注 → 格式化预览</div>'; return; }
+
+      try {
+        const fountainText = annotatedToFountain(annotated);
+        const result = fountain.parse(fountainText);
+
+        preview.innerHTML =
+          (result.html.title_page ? '<div id="title-page">' + result.html.title_page + '</div>' : '') +
+          '<div id="script" class="page">' + result.html.script + '</div>';
+
+        if (document.getElementById('btn-annotate').disabled) {
+          preview.scrollTop = preview.scrollHeight;
+        }
+      } catch (err) {
+        preview.innerHTML = '<div class="placeholder" style="color:#e94560">格式化失败: ' + err.message + '</div>';
+        console.error("Format Error:", err);
+      }
+    }
+
+    // ── 纯前端的标注→Fountain 转换引擎 ──────────────────────────
+    function annotatedToFountain(text) {
+      const lines = text.split('\n');
+      const parsed = [];
+
+      // 1. 解析
+      for (let line of lines) {
+        const s = line.replace(/\s+$/, ''); // 去除尾部空格
+        if (!s) {
+          parsed.push(['blank', '']);
+          continue;
+        }
+        const m = s.match(/^\[([a-z])\]\s*(.*)/);
+        if (m) {
+          parsed.push([m[1], m[2].trim()]);
+        } else {
+          parsed.push(['a', s]);
+        }
+      }
+
+      // 2. 合并空行
+      const merged = [];
+      for (let [t, txt] of parsed) {
+        if (t === 'blank') {
+          if (merged.length > 0 && merged[merged.length - 1][0] !== 'blank') {
+            merged.push(['blank', '']);
+          }
+        } else {
+          merged.push([t, txt]);
+        }
+      }
+      while (merged.length > 0 && merged[0][0] === 'blank') merged.shift();
+      while (merged.length > 0 && merged[merged.length - 1][0] === 'blank') merged.pop();
+
+      // 3. 构建
+      const output = [];
+      let i = 0;
+      const n = merged.length;
+
+      while (i < n) {
+        let [t, txt] = merged[i];
+
+        if (t === 'blank') {
+          output.push('');
+          i++; continue;
+        }
+
+        if (t === 'h') {
+          // 清理场景前缀，同后端逻辑
+          let cleanTxt = txt.replace(/^[【\[(（](.*?)[】\])）]$/, '$1').trim();
+          cleanTxt = cleanTxt.replace(/^[\d.、\s]+/, '').trim();
+          let u = cleanTxt.toUpperCase();
+          let isStandard = ['INT', 'EXT', 'EST', 'I/E', 'INT.', 'EXT.', 'EST.', 'INT/EXT', 'INT./EXT', 'I./E'].some(p => u.startsWith(p));
+          output.push(isStandard ? cleanTxt : '.' + cleanTxt);
+        } else if (t === 'a') {
+          output.push(txt);
+        } else if (t === 'c') {
+          // 构建对话块
+          let charName = txt.replace(/[:：\s]+$/, '').trim();
+          // 处理扩展
+          let exts = ["(V.O.)", "(O.S.)", "(CONT'D)", "(VO)", "(OS)"];
+          let base = charName; let ext = "";
+          for (let e of exts) {
+            if (charName.toUpperCase().includes(e)) {
+              base = charName.toUpperCase().replace(e, '').trim();
+              ext = e; break;
+            }
+          }
+          if (/^[\x00-\x7F]+$/.test(base)) base = base.toUpperCase();
+          charName = ext ? base + " " + ext : base;
+
+          let block = [charName];
+          i++;
+          while (i < n) {
+            let [nt, ntxt] = merged[i];
+            if (nt === 'blank') break;
+            if (nt === 'p') {
+              let cleanP = ntxt.replace(/^[（(]*(.*?)[)）]*$/, '$1').trim();
+              block.push('(' + cleanP + ')');
+              i++;
+            } else if (nt === 'd') {
+              block.push(ntxt);
+              i++;
+            } else {
+              break;
+            }
+          }
+          output.push(block.join('\n'));
+          continue; // 跳过外层 i++
+        } else if (t === 't') {
+          let u = txt.toUpperCase().replace(/\.$/, '');
+          let isStandard = u.endsWith('TO:') || ['FADE IN', 'FADE OUT', 'FADE TO BLACK', 'CUT TO BLACK'].includes(u);
+          output.push(isStandard ? txt : '> ' + txt);
+        } else if (t === 'l') {
+          output.push(txt.split('\n').map(l => l.trim() ? '~ ' + l.trim() : '').join('\n'));
+        } else if (t === 'n') {
+          output.push('> ' + txt + ' <');
+        } else if (t === 's') {
+          output.push(txt.startsWith('#') ? txt : '# ' + txt);
+        } else if (t === 'y') {
+          output.push('= ' + txt);
+        } else if (t === 'x') {
+          output.push('[[ ' + txt + ' ]]');
+        } else if (t === 'b') {
+          output.push('/* ' + txt + ' */');
+        } else if (t === 'g') {
+          output.push('===');
+        } else {
+          output.push(txt);
+        }
+
+        i++;
+      }
+
+      return output.join('\n\n');
+    }
+
+    function applyTag() {
+      const sel = document.getElementById('tag-select');
+      const tag = sel.value;
+      if (!tag) return;
+      const editor = document.getElementById('editor');
+      const start = editor.selectionStart, end = editor.selectionEnd;
+      const text = editor.value;
+      const lineStart = text.lastIndexOf('\n', start - 1) + 1;
+      const lineEnd = text.indexOf('\n', end);
+      const actualEnd = lineEnd === -1 ? text.length : lineEnd;
+      let selectedLines = text.substring(lineStart, actualEnd);
+      const tagged = selectedLines.split('\n').map(line => {
+        const trimmed = line.trim();
+        if (!trimmed) return line;
+        return '[' + tag + '] ' + trimmed.replace(/^\[[a-z]\]\s*/, '');
+      }).join('\n');
+      editor.value = text.substring(0, lineStart) + tagged + text.substring(actualEnd);
+      editor.selectionStart = lineStart; editor.selectionEnd = lineStart + tagged.length;
+      editor.focus(); sel.value = ''; doFormat();
+    }
+
+    function clearTags() {
+      const editor = document.getElementById('editor');
+      editor.value = editor.value.split('\n').map(l => l.replace(/^\[[a-z]\]\s*/, '')).join('\n');
+      doFormat();
+    }
+
+    document.addEventListener('keydown', function (e) {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); startAnnotate(); }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'p') { e.preventDefault(); doFormat(); }
+    });
+
+    document.getElementById('editor').value =
+      `【1. 内景. 地铁 - 下午】
+
+夕阳从地铁站出口斜照进来，把台阶上的人影拉得很长。
+
+男生站在闸机外面。手里提着一个纸袋。
+
+他的工牌还挂在脖子上。"Tech Lead"几个字朝外。
+
+他低头看了一眼工牌，把它摘下来，翻到背面。他看了两秒，把工牌塞进纸袋里。
+
+他刷卡进站。
+
+站台上人不多。下午四点，不是高峰期。
+
+他走到站台中间，站住了。
+
+左边的列车进站了。门开了。有人上车，有人下车。
+
+他没动。`;
+
+    // ── 文件上传相关逻辑 ──────────────────────────────
+
+    function handleDragOver(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      document.getElementById('upload-zone').classList.add('drag-over');
+    }
+
+    function handleDragLeave(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      document.getElementById('upload-zone').classList.remove('drag-over');
+    }
+
+    function handleDrop(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      document.getElementById('upload-zone').classList.remove('drag-over');
+      const files = e.dataTransfer.files;
+      if (files.length > 0) {
+        uploadFile(files[0]);
+      }
+    }
+
+    function handleFileSelect(e) {
+      const files = e.target.files;
+      if (files.length > 0) {
+        uploadFile(files[0]);
+      }
+      // 重置 input 以便重复选择同一文件
+      e.target.value = '';
+    }
+
+    async function uploadFile(file) {
+      const statusEl = document.getElementById('upload-status');
+      const statusText = document.getElementById('status-text');
+      const editor = document.getElementById('editor');
+
+      const allowed = ['.docx', '.pdf', '.md', '.markdown', '.txt', '.fountain'];
+      const ext = '.' + file.name.split('.').pop().toLowerCase();
+      if (!allowed.includes(ext)) {
+        showUploadStatus('❌ 不支持的文件格式：' + ext, true);
+        return;
+      }
+
+      showUploadStatus('⏳ 正在解析文件：' + file.name + ' ...', false);
+      statusText.textContent = '上传解析中...';
+
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const resp = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!resp.ok) {
+          const err = await resp.json();
+          throw new Error(err.detail || '上传失败');
+        }
+
+        const data = await resp.json();
+        editor.value = data.text;
+        showUploadStatus('✅ 已加载：' + file.name + ' (' + (data.text.length) + ' 字符)', false);
+        statusText.textContent = '文件已加载';
+        setTimeout(() => { hideUploadStatus(); }, 3000);
+
+        // 自动触发表格化预览
+        doFormat();
+      } catch (err) {
+        showUploadStatus('❌ ' + err.message, true);
+        statusText.textContent = '上传失败';
+      }
+    }
+
+    function showUploadStatus(msg, isError) {
+      const el = document.getElementById('upload-status');
+      el.textContent = msg;
+      el.classList.add('show');
+      if (isError) el.classList.add('error');
+      else el.classList.remove('error');
+    }
+
+    function hideUploadStatus() {
+      const el = document.getElementById('upload-status');
+      el.classList.remove('show', 'error');
+    }
+
+    // ── 粘贴事件：支持 Ctrl+V 将剪贴板内容粘贴到编辑器 ──
+    // （textarea 原生支持粘贴文本，这里额外处理粘贴图片/文件的提示）
+    document.getElementById('editor').addEventListener('paste', function (e) {
+      // textarea 原生已支持文本粘贴，无需额外处理
+      // 但如果剪贴板有文件，提示用户使用上传区
+      const items = e.clipboardData.items;
+      for (const item of items) {
+        if (item.kind === 'file') {
+          e.preventDefault();
+          uploadFile(item.getAsFile());
+          return;
+        }
+      }
+      // 文本粘贴走原生逻辑，粘贴后自动预览
+      setTimeout(() => doFormat(), 100);
+    });
+
+    // ── 全局拖拽：阻止浏览器默认打开文件的行为 ──
+    document.addEventListener('dragover', function (e) {
+      e.preventDefault();
+    });
+    document.addEventListener('drop', function (e) {
+      e.preventDefault();
+    });
+  </script>
+</body>
+
+</html>
