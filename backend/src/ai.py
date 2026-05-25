@@ -4,6 +4,7 @@ AI 标注器 —— 本地 BERT 模型推理版。
 """
 
 import os
+import re
 import torch
 from typing import AsyncGenerator
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
@@ -98,8 +99,42 @@ async def annotate_stream(script_text: str) -> AsyncGenerator[str, None]:
         for idx, label in zip(non_empty_indices, labels):
             result_lines[idx] = f"[{label}] {result_lines[idx]}"
 
-        # 5. 合并并发送给前端
-        final_text = "\n".join(result_lines)
+        # 5. 合并相邻同标签行 —— 按标签边界重新换行，而非保留原始换行
+        merged_lines = []
+        i = 0
+        while i < len(result_lines):
+            line = result_lines[i]
+            if not line.strip():
+                merged_lines.append(line)
+                i += 1
+                continue
+
+            m = re.match(r'^\[([a-z])\]\s?(.*)', line)
+            if not m:
+                merged_lines.append(line)
+                i += 1
+                continue
+
+            tag = m.group(1)
+            content_parts = [m.group(2)]
+            i += 1
+
+            # 向后扫描：相同标签且非空行则合并（用空格连接）
+            while i < len(result_lines):
+                next_line = result_lines[i]
+                if not next_line.strip():
+                    break
+                next_m = re.match(r'^\[([a-z])\]\s?(.*)', next_line)
+                if not next_m or next_m.group(1) != tag:
+                    break
+                content_parts.append(next_m.group(2))
+                i += 1
+
+            # 中文剧本：合并同行不额外加空格
+            merged_lines.append(f"[{tag}] {''.join(content_parts)}")
+
+        # 6. 合并并发送给前端
+        final_text = "\n".join(merged_lines)
         escaped = final_text.replace("\\", "\\\\").replace("\n", "\\n").replace("\"", "\\\"")
         
         yield f"data: {{\"type\": \"text\", \"content\": \"{escaped}\"}}\n\n"
