@@ -22,3 +22,6 @@ Thumbs.db
 
 # Docker
 data/
+
+# 本地模型权重（体积约 391MB，不随仓库分发，获取方式见 README「模型权重从哪来」）
+backend/model/

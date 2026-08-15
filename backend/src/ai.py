@@ -17,8 +17,12 @@ TYPE_MAP: dict[str, str] = {
     "y": "synopsis", "x": "note", "b": "boneyard", "g": "page_break",
 }
 
-# 模型路径定位到 backend/model/best_script_bert_model
-MODEL_PATH = os.path.join(os.path.dirname(__file__), "..", "model", "best_script_bert_model")
+# 模型路径：默认定位到 backend/model/best_script_bert_model
+# 可通过环境变量 SCRIPT_ASSISTANT_MODEL_PATH 覆盖（便于更换模型而不必改动代码）
+MODEL_PATH = os.environ.get(
+    "SCRIPT_ASSISTANT_MODEL_PATH",
+    os.path.join(os.path.dirname(__file__), "..", "model", "best_script_bert_model"),
+)
 
 # ── 模型加载器（单例模式，避免每次请求重复加载显存/内存） ─────────
 class ScriptAnnotator:
@@ -57,6 +61,35 @@ class ScriptAnnotator:
 annotator = ScriptAnnotator()
 
 
+def _split_scene_and_action(line: str) -> list[str]:
+    """
+    检测并拆分"场号+动作"混合行。
+    例如："【1. 内景. 地铁 - 下午】夕阳从地铁站出口斜照进来..."
+    -> ["【1. 内景. 地铁 - 下午】", "夕阳从地铁站出口斜照进来..."]
+    """
+    # 模式1: 找到【...】或[...]的结尾，检查后面是否有内容
+    for bracket_pair in [('【', '】'), ('[', ']')]:
+        left, right = bracket_pair
+        stripped_line = line.lstrip()
+        if stripped_line.startswith(left):
+            try:
+                end_idx = stripped_line.index(right)
+                scene_part = stripped_line[:end_idx + len(right)]
+                rest = stripped_line[end_idx + len(right):].lstrip()
+                if rest and re.search(r'(INT|EXT|EST|I/E|\d+[\.\、])', scene_part, re.IGNORECASE):
+                    return [scene_part, rest]
+            except ValueError:
+                pass
+    
+    # 模式2: N. INT/EXT ... 后续动作（没有括号）
+    # 场号部分：数字+INT/EXT，但要在第一个多于2个字符的空格或中文处停止
+    m2 = re.match(r'^[\s]*(\d+[\.\、]?\s*(?:INT|EXT|EST|I/E)[^，。：\n]*?)[\s]{2,}(.+)$', line, re.IGNORECASE)
+    if m2 and m2.group(2).strip():
+        return [m2.group(1).strip(), m2.group(2).strip()]
+    
+    return [line]
+
+
 async def annotate_stream(script_text: str) -> AsyncGenerator[str, None]:
     """
     为了兼容前端的 SSE 接收逻辑，依然保留 AsyncGenerator。
@@ -70,10 +103,15 @@ async def annotate_stream(script_text: str) -> AsyncGenerator[str, None]:
     try:
         lines = script_text.split('\n')
         
+        # 0. 预处理：拆分"场号+动作"混合行
+        expanded_lines = []
+        for line in lines:
+            expanded_lines.extend(_split_scene_and_action(line))
+        
         # 1. 提取非空行并记录它们的原始索引，用于构建滑动窗口
         non_empty_lines = []
         non_empty_indices = []
-        for i, line in enumerate(lines):
+        for i, line in enumerate(expanded_lines):
             if line.strip():
                 non_empty_lines.append(line.strip())
                 non_empty_indices.append(i)
@@ -95,7 +133,7 @@ async def annotate_stream(script_text: str) -> AsyncGenerator[str, None]:
             labels.extend(annotator.predict(batch_texts))
 
         # 4. 将预测的标签拼回原始文本的对应行
-        result_lines = lines.copy()
+        result_lines = expanded_lines.copy()
         for idx, label in zip(non_empty_indices, labels):
             result_lines[idx] = f"[{label}] {result_lines[idx]}"
 
